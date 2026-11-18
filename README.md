@@ -9,6 +9,16 @@ Small Windows utilities that live beside the clock.
 
 ## Install
 
+### Download the apps
+
+Get `MouseBattery.exe` and `AudioSwitcher.exe` from the [latest release](https://github.com/kashavpiya/tray-tools/releases/latest). Python is bundled, so you can run these files directly on Windows x64.
+
+Keep the executables in a permanent folder before enabling **Start when I sign in** from each tray menu. On its first launch, Audio Switcher opens a device picker. To change your pair later, right-click its icon and choose **Choose audio outputs...**. Settings are saved under `%LOCALAPPDATA%\TrayTools\AudioSwitcher`; Mouse Battery stores status under `%LOCALAPPDATA%\TrayTools\MouseBattery`.
+
+These initial builds are unsigned, so Windows may show an unrecognized publisher prompt. Mouse Battery still needs G HUB running. Only launch one copy of each tool; exit older Python versions from their tray menus first.
+
+### Run from source
+
 Requires Windows 10/11 and Python 3.10 or newer, with `python` available in your terminal. Tested with Python 3.14. Mouse Battery also requires Logitech G HUB running locally.
 
 Download or clone this repository, then open PowerShell in its folder:
@@ -62,5 +72,7 @@ python -m venv .venv
 ```
 
 Uses [pystray](https://github.com/moses-palmer/pystray), [Pillow](https://github.com/python-pillow/Pillow), [pycaw](https://github.com/AndreMiras/pycaw), and [websocket-client](https://github.com/websocket-client/websocket-client). These projects have their own licenses. G HUB protocol behavior was investigated with reference to [LogiBAT](https://github.com/someweirdhuman/LogiBAT).
+
+Build executables on Windows with `powershell -ExecutionPolicy Bypass -File .\build.ps1`. The build installs pinned dependencies and PyInstaller, then puts the two executables in `dist\`. Release assets include third-party license notices.
 
 MIT licensed. Contributions and bug reports are welcome. Keep personal device IDs and diagnostic files out of pull requests.

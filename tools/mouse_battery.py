@@ -12,19 +12,23 @@ import websocket
 import pystray
 from PIL import Image, ImageDraw, ImageFont
 
-BASE = Path(__file__).resolve().parent
+FROZEN = getattr(sys, 'frozen', False)
+BASE = Path(os.environ['LOCALAPPDATA']) / 'TrayTools' / 'MouseBattery' if FROZEN else Path(__file__).resolve().parent
+BASE.mkdir(parents=True, exist_ok=True)
 STOP = threading.Event()
 REFRESH = threading.Event()
-mutex = ctypes.windll.kernel32.CreateMutexW(None, False, 'Local\\LogitechMouseBatteryTray')
-if ctypes.windll.kernel32.GetLastError() == 183:
-    sys.exit(0)
+
+def startup_command():
+    if FROZEN:
+        return f'"{sys.executable}"'
+    return f'"{Path(sys.executable).with_name("pythonw.exe")}" "{Path(__file__).resolve()}"'
 
 def artwork(value=None, charging=False):
     image = Image.new('RGBA', (64, 64))
     draw = ImageDraw.Draw(image)
     color = '#64dfaa' if charging else '#ff7777' if value is not None and value <= 20 else '#ffffff'
     text = '--' if value is None else str(value)
-    font = ImageFont.truetype('C:/Windows/Fonts/segoeuib.ttf', 44 if len(text) < 3 else 33)
+    font = ImageFont.truetype(str(Path(os.environ.get('WINDIR', 'C:/Windows')) / 'Fonts' / 'segoeuib.ttf'), 44 if len(text) < 3 else 33)
     draw.text((32, 28), text, font=font, fill=color, anchor='mm', stroke_width=1)
     draw.rounded_rectangle((5, 55, 59, 61), radius=3, fill='#4d5663')
     if value:
@@ -94,10 +98,29 @@ def toggle_startup(icon, item):
         if startup_enabled():
             winreg.DeleteValue(key, 'LogitechMouseBattery')
         else:
-            winreg.SetValueEx(key, 'LogitechMouseBattery', 0, winreg.REG_SZ, f'"{Path(sys.executable).with_name("pythonw.exe")}" "{Path(__file__).resolve()}"')
+            winreg.SetValueEx(key, 'LogitechMouseBattery', 0, winreg.REG_SZ, startup_command())
 
 def open_ghub(icon, item):
-    os.startfile(r'C:\Program Files\LGHUB\lghub.exe')
+    path = Path(os.environ.get('ProgramFiles', 'C:/Program Files')) / 'LGHUB' / 'lghub.exe'
+    if path.exists():
+        os.startfile(str(path))
+    else:
+        icon.notify('Open Logitech G HUB from the Start menu.', 'Mouse Battery')
+
+if '--self-test' in sys.argv:
+    artwork(81).save(BASE / 'self-test-icon.png')
+    result = dict(icon=True)
+    try:
+        with closing(websocket.create_connection('ws://localhost:9010', timeout=5, origin='file://', subprotocols=['json'])) as ws:
+            devices = request(ws, '/devices/list').get('deviceInfos', [])
+            mice = [d for d in devices if d.get('deviceType') == 'MOUSE' and d.get('capabilities', {}).get('hasBatteryStatus')]
+            result['mice'] = len(mice)
+            if mice:
+                result['percentage'] = request(ws, '/battery/' + mice[0]['id'] + '/state').get('percentage')
+    except Exception as error:
+        result['error'] = str(error)
+    (BASE / 'self-test.json').write_text(json.dumps(result))
+    sys.exit(0)
 
 icon = pystray.Icon('LogitechMouseBattery', artwork(), 'Mouse battery: connecting', menu=pystray.Menu(
     pystray.MenuItem('Refresh battery', lambda icon, item: REFRESH.set(), default=True),
@@ -111,4 +134,8 @@ def setup(icon):
     threading.Thread(target=update, args=(icon,), daemon=True).start()
 
 if __name__ == '__main__':
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, 'Local\\LogitechMouseBatteryTray')
+    if ctypes.windll.kernel32.GetLastError() == 183:
+        sys.exit(0)
     icon.run(setup)
+    ctypes.windll.kernel32.CloseHandle(mutex)
