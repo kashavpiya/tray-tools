@@ -1,0 +1,4 @@
+Pillow==13.0.0
+pystray==0.19.5
+websocket-client==1.9.2
+pycaw==20260927
